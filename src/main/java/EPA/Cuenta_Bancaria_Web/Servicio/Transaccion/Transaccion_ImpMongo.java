@@ -12,10 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 
 @Service
 @Qualifier("MONGO")
@@ -26,65 +25,49 @@ public class Transaccion_ImpMongo implements I_Transaccion
 
     @Autowired
     I_RepositorioCuentaMongo cuenta_repositorio;
-/*
+
     @Override
-    public M_Transaccion_DTO Procesar_Deposito(String id_Cuenta, Enum_Tipos_Deposito tipo, BigDecimal monto)
+    public Mono<M_Transaccion_DTO> Procesar_Deposito(String id_Cuenta, Enum_Tipos_Deposito tipo, BigDecimal monto)
     {
-        BigDecimal costo = BigDecimal.ZERO;
+        final BigDecimal costo = tipo.getCosto();
 
-        switch (tipo)
-        {
-            case CAJERO: costo = BigDecimal.valueOf(Double.valueOf(System.getenv("EPA.Deposito.Cajero"))); break;
-            case SUCURSAL: costo = BigDecimal.valueOf(Double.valueOf(System.getenv("EPA.Deposito.Sucursal")));  break;
-            case OTRA_CUENTA: costo = BigDecimal.valueOf(Double.valueOf(System.getenv("EPA.Deposito.OtraCuenta")));  break;
-        }
+         return cuenta_repositorio.findById(id_Cuenta)
+                .map(acc -> {
 
-        M_CuentaMongo cuentaCliente = cuenta_repositorio.findByid(id_Cuenta);
+                    BigDecimal bdSaldoNuevo = acc.getSaldo_Global().add(monto.subtract(costo));
+                    M_TransaccionMongo mTransaccionMongo = new M_TransaccionMongo(
+                            acc,
+                            monto,
+                            acc.getSaldo_Global(),
+                            bdSaldoNuevo,
+                            costo,
+                            tipo.toString()
+                    );
+                    acc.setSaldo_Global(bdSaldoNuevo);
+                    return transaccion_repositorio.save(mTransaccionMongo)
+                            .flatMap(t -> {
+                                return cuenta_repositorio.save(acc).map(a -> t);
+                            });
 
-        if(cuentaCliente == null)
-        {
-            return null;
-        }
-
-        BigDecimal bdSaldoActual = cuentaCliente.getSaldo_Global();
-        BigDecimal bdSaldoNuevo  = cuentaCliente.getSaldo_Global().add(monto.subtract(costo));
-
-        M_TransaccionMongo transaccion = new M_TransaccionMongo(
-                cuentaCliente,
-                monto,
-                bdSaldoActual,
-                bdSaldoNuevo,
-                costo,
-                tipo.toString()
-        );
-
-        cuentaCliente.setSaldo_Global(bdSaldoNuevo);
-
-        //M_Transaccion transaccion_Creada = transaccion_repositorio.create(transaccion);
-        M_TransaccionMongo transaccion_Creada = transaccion_repositorio.save(transaccion);
-        M_CuentaMongo cuentaActualizada = cuenta_repositorio.save(cuentaCliente);
-
-        if(transaccion_Creada == null)
-        {
-            return null;
-        }
-
-        M_Transaccion_DTO dtoCreado = new M_Transaccion_DTO(transaccion_Creada.getId(),
-                new M_Cuenta_DTO(transaccion_Creada.getCuenta().getId(),
-                        new M_Cliente_DTO(transaccion_Creada.getCuenta().getCliente().getId(),
-                                transaccion_Creada.getCuenta().getCliente().getNombre()
+                })
+                .flatMap(t -> t)
+                .map(dbTransaction -> new M_Transaccion_DTO(dbTransaction.getId(),
+                        new M_Cuenta_DTO(
+                                dbTransaction.getCuenta().getId(),
+                                new M_Cliente_DTO(
+                                        dbTransaction.getCuenta().getCliente().getId(),
+                                        dbTransaction.getCuenta().getCliente().getNombre()
+                                ),
+                                dbTransaction.getCuenta().getSaldo_Global()
                         ),
-                        transaccion_Creada.getCuenta().getSaldo_Global()
-                ), transaccion_Creada.getMonto_transaccion(),
-                transaccion_Creada.getSaldo_inicial(),
-                transaccion_Creada.getSaldo_final(),
-                transaccion_Creada.getCosto_tansaccion(),
-                transaccion_Creada.getTipo()
-        );
-
-        return dtoCreado;
+                        dbTransaction.getMonto_transaccion(),
+                        dbTransaction.getSaldo_inicial(),
+                        dbTransaction.getSaldo_final(),
+                        dbTransaction.getCosto_tansaccion(),
+                        dbTransaction.getTipo()
+                ));
     }
-*/
+
     @Override
     public Flux<M_Transaccion_DTO> findAll()
     {

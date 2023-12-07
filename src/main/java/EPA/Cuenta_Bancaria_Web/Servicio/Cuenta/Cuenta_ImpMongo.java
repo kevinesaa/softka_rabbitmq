@@ -8,13 +8,10 @@ import EPA.Cuenta_Bancaria_Web.Repositorio.Mongo.I_RepositorioCuentaMongo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.List;
 
-public class Cuenta_ImpMongo{}
-
-/*
 @Service()
 @Qualifier("MONGO")
 public class Cuenta_ImpMongo implements I_Cuenta
@@ -23,7 +20,7 @@ public class Cuenta_ImpMongo implements I_Cuenta
     I_RepositorioCuentaMongo repositorio_Cuenta;
 
     @Override
-    public M_Cuenta_DTO crear_Cuenta(M_Cuenta_DTO p_Cuenta_DTO)
+    public Mono<M_Cuenta_DTO> crear_Cuenta(M_Cuenta_DTO p_Cuenta_DTO)
     {
         M_CuentaMongo cuenta = new M_CuentaMongo(p_Cuenta_DTO.getId(),
                 new M_ClienteMongo(p_Cuenta_DTO.getCliente().getId(),
@@ -31,37 +28,29 @@ public class Cuenta_ImpMongo implements I_Cuenta
                 p_Cuenta_DTO.getSaldo_Global());
 
         //M_Cuenta cuenta_Creada = repositorio_Cuenta.create(cuenta);
-        M_CuentaMongo cuenta_Creada = repositorio_Cuenta.save(cuenta);
+        return repositorio_Cuenta.save(cuenta).map( account ->
+            new M_Cuenta_DTO(account.getId(),
+                    new M_Cliente_DTO(account.getCliente().getId(),
+                            account.getCliente().getNombre()),
+                    account.getSaldo_Global())
+        );
 
-        if(cuenta_Creada == null)
-        {
-            return null;
-        }
 
-        M_Cuenta_DTO dtoCreado = new M_Cuenta_DTO(cuenta_Creada.getId(),
-                new M_Cliente_DTO(cuenta_Creada.getCliente().getId(),
-                        cuenta_Creada.getCliente().getNombre()),
-                cuenta_Creada.getSaldo_Global());
-
-        return dtoCreado;
     }
 
     @Override
-    public List<M_Cuenta_DTO> findAll()
+    public Flux<M_Cuenta_DTO> findAll()
     {
-        List<M_CuentaMongo> l_Cuentas = repositorio_Cuenta.findAll();
-        List<M_Cuenta_DTO> l_Cuentas_DTO = new ArrayList<M_Cuenta_DTO>();
-
-        for(M_CuentaMongo c : l_Cuentas)
-        {
-            M_Cuenta_DTO dtoCreado = new M_Cuenta_DTO(c.getId(),
-                    new M_Cliente_DTO(c.getCliente().getId(),
-                            c.getCliente().getNombre()),
-                    c.getSaldo_Global());
-            l_Cuentas_DTO.add(dtoCreado);
-        }
-
-        return l_Cuentas_DTO;
+        return repositorio_Cuenta
+                .findAll()
+                .map(c -> new M_Cuenta_DTO(
+                        c.getId(),
+                        new M_Cliente_DTO(
+                                c.getCliente().getId(),
+                                c.getCliente().getNombre()
+                        ), c.getSaldo_Global())
+                );
     }
+
+
 }
-*/
